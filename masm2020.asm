@@ -12,34 +12,66 @@ includelib includes\masm32.lib
 includelib includes\kernel32.lib
 .data
 endl 		db 0dh, 0ah, 0 ;символы конца строки
-s1			db 'sha vse buit',0 ;просто сообщение, прикол
+s1			db 'arg1 -- path from (*.bmp only) | arg2 -- path to',0dh,0ah,'-h [num] -- height scale',0dh,0ah,'-w [num] -- width scale',0dh,0ah,'-s [MN0s=;,.] -- chars setup',0dh,0ah,0 ;просто сообщение, прикол
 pos			dd 0 
 hei 		dd 0 ; высота ихображения
 wid 		dd 0 ;ширины изобпвжения
-;setup 		db ' .:;+=xX$&',0  ;градиент символов
-setup 		db ' &$Xx=-:. ',0  ;градиент символов
+s2			db '>>>setup>>>',0
+setup 		db 'MN0s=;,.', 256 dup (0)  ;градиент символов
+
 file 		dd 0
 fileready 	dd 0
+s3			db '>>>hkoef>>>',0
 hkoef 		dd 2
+s4			db '>>>wkoef>>>',0
 wkoef		dd 1
-setupLength dd 9d
-kostil		dd 0
+s5			db '>>>setupLength>>>',0
+setupLength dd 0d
 
-path db 'D:\unnamed.bmp',0
-mode db 'r+b',0
-outpath db 'D:\unnamed.txt',0
-
+s6			db '>>>path>>>',0
+path db 256 dup (0)
+moder db 'r+b',0
+modew db 'w+b',0
+s7			db '>>>pathout>>>',0
+outpath db 256 dup (0)
+s8			db '>>>TE>>>',0
+te db 100 dup (0)
+s9 db 'Error. Missing paths',0dh, 0ah,0
+s10 db 'Error. Cant read input file',0dh, 0ah,0
 .code
 
 
+
 start:
-	
-
 	invoke crt_printf,offset s1 ;пишем херню
+	call commangr ;тут добываем параметры. комманд манагер
+	 call setlengt
+	dec setupLength
+  
+  mov al, [path]
+  test al, al
+  jz argnok
+  mov al, [outpath]
+  test al, al
+  jz argnok
+  
+  jmp ok
+  argnok:
+  	invoke crt_printf, offset s9
+  	exit
+  	ok:
+  	
+	
 
 	
 	
-	invoke crt_fopen, offset path, offset mode ;open file, eax = pointеr
+	invoke crt_fopen, offset path, offset moder ;open file, eax = pointеr
+	  test eax, eax
+	 jnz fileok
+    invoke crt_printf, offset s10
+  	exit
+    
+    fileok:
 	mov esi, eax ;та херня возвращает FILE, открываем поток файла
 	    
     invoke crt_fseek, esi, 0, 2 ;указатель по файлу в конец
@@ -57,6 +89,8 @@ start:
 
     invoke crt_fread, eax, 1d, ebx, esi ; read file
     invoke crt_ferror, esi	;зачем-то чекаем на наличие ошибок
+  
+   
 	invoke crt_fclose, esi	;закрываем поток файла
     
     mov edx, file ;дублируем ссылку на начала файла (в памяти в едх)
@@ -85,7 +119,7 @@ start:
       call toAcii ;а теперь все эти серые конвертим в аски соответсвие
 
 				;осталось записать
-	invoke crt_fopen, offset outpath, offset mode 
+	invoke crt_fopen, offset outpath, offset modew 
 	mov edi, eax
 	;теперь переписываем запись. БРУУУХ
 	;хорошо бы вынести сжатие в отденый процес, а запись сразу по строчкам. Ибо
@@ -318,5 +352,124 @@ push ebp
 	ret 0
       to1byte endp
       
+      commangr proc
+      	push ebp
+      mov ebp, esp
+      
+    ; invoke GetCL, 1, offset te ;спасибо какому-то челу на каком-то форуме. Просто. Большое. Человеческое. Спасибо. :`) 
+      
+      ;откуда куда -h вертикаль -w горизонталь  -s набор_символов
+      ; -h цифра
+      ; -w цифра
+      ; -s символы
+      invoke GetCL, 1, offset path
+      invoke GetCL, 2, offset outpath
+      
+      mov ecx, 3
+      
+      cmdl:
+      	push ecx
+      invoke GetCL, ecx, offset te
+      pop ecx
+      mov al, [te+1]
+      cmp al, 'h'
+      jz hcmd
+      cmp al, 'w'
+      jz wcmd
+      cmp al, 's'
+      jz scmd
+      
+      
+      inc ecx
+      nextc:
+      cmp ecx, 8
+      jl cmdl
+      jmp done
+      
+      hcmd:
+      	inc ecx
+      	push ecx
+      	invoke GetCL, ecx, offset te
+      	pop ecx
+      	push offset te
+      	call atoi
+      	mov hkoef, eax
+      	jmp nextc
+      	
+      	wcmd:
+      		
+      	inc ecx
+      	push ecx
+      	invoke GetCL, ecx, offset te
+      	pop ecx
+      	push offset te
+      	call atoi
+      	mov wkoef, eax
+      	jmp nextc
+      		
+      		scmd:
+      			
+		mov [setup], 0
+		mov [setup+1], 0
+		mov [setup+2], 0
+		mov [setup+3], 0
+		mov [setup+4], 0
+		mov [setup+5], 0
+		mov [setup+6], 0
+		mov [setup+7], 0
+		mov [setup+8], 0
+		mov [setup+9], 0
+      			
+      inc ecx
+      push ecx
+      	invoke GetCL, ecx, offset setup
+      pop ecx
+      done:
+      pop ebp
+      ret 0
+      commangr endp
+      
+      
+      atoi proc
+      push ebp
+      mov ebp, esp
+      push ecx
+      
+      xor eax, eax
+      xor ebx, ebx
+      mov esi, [ebp+8]
+       mov ecx, 10d
+      loop4:
+      	mov bl, [esi]
+      	test bl, bl
+      jz done
+      sub bl, 48d
+     
+      mul ecx
+      add eax, ebx 
+      inc esi
+      jmp loop4
+      
+      done:
+      	pop ecx
+      pop ebp
+      ret 4
+      atoi endp
+      
+      
+      setlengt proc
+      	mov esi, offset setup
+      	
+      	loop5:
+      	mov bl, [esi]
+      	test bl, bl
+      jz nextc
+		inc esi
+		inc setupLength
+      jmp loop5
+      
+      nextc:
+      ret 0
+      setlengt endp
       
   end start
