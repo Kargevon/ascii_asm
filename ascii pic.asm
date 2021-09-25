@@ -45,11 +45,14 @@ s10 db 'Error. Cant read input file',0dh, 0ah,0
 start:
 	invoke crt_printf,offset s1 ;пишем херню
 	call commangr ;тут добываем параметры. комманд манагер
-	 call setlengt
-	dec setupLength
+	 call setlengt ;высчитываем длину строки настроек
+	dec setupLength	;так надо
   
+  
+  ;далее чек на патчи. Точнее на паффы
+  ;если нулевые - сообщение об ошибке
   mov al, [path]
-  test al, al
+  test al, al 
   jz argnok
   mov al, [outpath]
   test al, al
@@ -67,7 +70,7 @@ start:
 	
 	invoke crt_fopen, offset path, offset moder ;open file, eax = pointеr
 	  test eax, eax
-	 jnz fileok
+	 jnz fileok ;чек на ошибку открытия. Если вернулось 0 - ошибка
     invoke crt_printf, offset s10
   	exit
     
@@ -150,7 +153,7 @@ start:
 	
 	loopwi:
 	
-	mov [ebp-0ch], dword ptr 0						; j = 0
+	mov [ebp-0ch], dword ptr 0	; j = 0
 	loopwj:
 	
 	
@@ -161,9 +164,9 @@ start:
 	cdq 
 	div ebx
 	test edx, edx
-	
+	;чекаем на попадание в коефициент. Если не ноль - скипаем
 	jnz nokj
-	
+	;а если ок - то записываем, считаем, т.п.
 	xor edx, edx
 	mov eax, [ebp-4]
 	mul dword ptr [ebp -10h]
@@ -180,13 +183,13 @@ start:
 	
 	invoke crt_fwrite, offset endl, 1d, 1d, edi 	;cout << endl
 	
-	omti:
+	omti: ;уан море тайм и. Кул нейм фор цикл
 	mov eax, [ebp-4]
 	mov ebx, hkoef
 	cdq 
 	div ebx
 	test edx, edx
-	jz oki
+	jz oki ;так же схема чека попадание в коеф, но для внешнего цикла, вертикали, и
 	
 	inc dword ptr [ebp-4]
 	jmp omti
@@ -216,8 +219,8 @@ toAcii proc
 	mov eax,  hei
 	mov ebx,  wid
 	mul ebx
-			;TODO test for edx
-	mov ecx, eax
+			
+	mov ecx, eax	;в есх теперь размер картинки
 	
 	xor edi, edi
 	mov edi, fileready
@@ -344,7 +347,7 @@ push ebp
 		
 		
 		loop lupI
-	add esp, 16
+	add esp, 16 ;подчищаем за собой мусор
 	
 	aaa
 	
@@ -362,14 +365,14 @@ push ebp
       ; -h цифра
       ; -w цифра
       ; -s символы
-      invoke GetCL, 1, offset path
-      invoke GetCL, 2, offset outpath
+      invoke GetCL, 1, offset path ;первый агрумент статически от
+      invoke GetCL, 2, offset outpath	;второй куда
       
       mov ecx, 3
       
       cmdl:
       	push ecx
-      invoke GetCL, ecx, offset te
+      invoke GetCL, ecx, offset te ;читаем аргумент, если второй символ соответсвует указателям аргументов - переходим в соотв. функцию обработки
       pop ecx
       mov al, [te+1]
       cmp al, 'h'
@@ -380,24 +383,26 @@ push ebp
       jz scmd
       
       
-      inc ecx
+      inc ecx ;и переходим к некст аргу
       nextc:
       cmp ecx, 8
       jl cmdl
       jmp done
       
       hcmd:
+      	;тут какая магия происходит:
+      		;считываем некст арг, т.е. как раз значение после указателя
       	inc ecx
       	push ecx
-      	invoke GetCL, ecx, offset te
+      	invoke GetCL, ecx, offset te ;вот тут как раз считывание
       	pop ecx
       	push offset te
-      	call atoi
-      	mov hkoef, eax
+      	call atoi ;там должна быть цифра, но текстом, так что вызываем самописную атои
+      	mov hkoef, eax ;и записываем в память
       	jmp nextc
       	
       	wcmd:
-      		
+      		;все тоже самое как для Х только для В
       	inc ecx
       	push ecx
       	invoke GetCL, ecx, offset te
@@ -408,7 +413,11 @@ push ebp
       	jmp nextc
       		
       		scmd:
-      			
+      			;а это магия для набора символов
+      			;нет, это не говнокод. Это ассемблер детка
+      			;это будет выполняться быстрее, чем цикл
+      			;а вообще, схема такая: если нет -с, то будет стандарт, то, что в мемори
+      			;но если чет ввели - очищаем и соханяем переданное
 		mov [setup], 0
 		mov [setup+1], 0
 		mov [setup+2], 0
@@ -422,7 +431,7 @@ push ebp
       			
       inc ecx
       push ecx
-      	invoke GetCL, ecx, offset setup
+      	invoke GetCL, ecx, offset setup ;вот тут как раз читаем что передано
       pop ecx
       done:
       pop ebp
@@ -431,6 +440,7 @@ push ebp
       
       
       atoi proc
+      	;кратко - умножаем аккум на 10, берем символ, делаем -'0', суммируем к аккуму
       push ebp
       mov ebp, esp
       push ecx
@@ -465,6 +475,7 @@ push ebp
       
       
       setlengt proc
+      	;все что связано с агрументами - пишу постфактум. Так что мне лень. Обычный цикл, ищем конец строки. Считаем ее длину
       	mov esi, offset setup
       	
       	loop5:
